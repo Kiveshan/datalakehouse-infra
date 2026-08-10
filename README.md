@@ -1,7 +1,7 @@
-# gov-skills data lakehouse
+# lakehouse-dms-iceberg-pipeline
 
-Terraform for a data lakehouse pipeline built for a South African government skills-development
-client. It replicates tables out of a client-owned Azure MySQL server, lands them in S3, and
+Terraform for a data lakehouse pipeline built for a public-sector skills-data client. It
+replicates tables out of a client-owned Azure MySQL server, lands them in S3, and
 transforms them through a layered lakehouse into Kimball-style dimension and fact tables — both
 queryable in place as Iceberg and mirrored into Postgres for downstream BI/reporting. Two Step
 Functions state machines, backed by nine Lambdas, orchestrate the whole thing end to end.

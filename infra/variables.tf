@@ -89,7 +89,7 @@ variable "dms_source_ssl_mode" {
 variable "dms_source_schema_name" {
   description = "Schema on the source to migrate. Every table in it is included."
   type        = string
-  default     = "source_schema"
+  default     = "source_db"
 }
 
 # ---------------------------------------------------------------------------
