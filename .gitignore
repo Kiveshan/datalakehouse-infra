@@ -1,0 +1,9 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars      
+tfplan
+CLAUDE.md
+.claude/
+lambda/*/node_modules/
+infra/lambda_builds/

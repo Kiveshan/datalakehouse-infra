@@ -1,0 +1,149 @@
+{
+  "Comment": "Archiving, DMS, Raw Processes -> Nightly ETL -> Update Layer2 (both sync)",
+  "StartAt": "Archive Previous raw data",
+  "States": {
+    "Archive Previous raw data": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "OutputPath": "$.Payload",
+      "Parameters": {
+        "Payload.$": "$",
+        "FunctionName": "${archive_raw_lambda_arn}"
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 1,
+          "MaxAttempts": 3,
+          "BackoffRate": 2,
+          "JitterStrategy": "FULL"
+        }
+      ],
+      "Next": "Start DMS"
+    },
+    "Start DMS": {
+      "Type": "Task",
+      "Resource": "${start_dms_lambda_arn}",
+      "Next": "Wait 2 mins"
+    },
+    "Wait 2 mins": {
+      "Type": "Wait",
+      "Seconds": 120,
+      "Next": "Check DMS Status"
+    },
+    "Check DMS Status": {
+      "Type": "Task",
+      "Resource": "${check_dms_status_lambda_arn}",
+      "Next": "DMS Status Decision",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 60,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ]
+    },
+    "DMS Status Decision": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.status",
+          "StringEquals": "stopped",
+          "Next": "Start Raw Crawler"
+        },
+        {
+          "Variable": "$.status",
+          "StringEquals": "failed",
+          "Next": "Send Failure Notification"
+        }
+      ],
+      "Default": "Wait 2 mins"
+    },
+    "Start Raw Crawler": {
+      "Type": "Task",
+      "Resource": "${run_raw_crawler_lambda_arn}",
+      "Parameters": {
+        "crawlerName": "${raw_crawler_name}"
+      },
+      "Next": "Wait For Raw Crawler"
+    },
+    "Wait For Raw Crawler": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "Check Raw Crawler"
+    },
+    "Check Raw Crawler": {
+      "Type": "Task",
+      "Resource": "${check_crawler_status_lambda_arn}",
+      "Parameters": {
+        "crawlerName": "${raw_crawler_name}"
+      },
+      "Next": "Raw Crawler Decision"
+    },
+    "Raw Crawler Decision": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.state",
+          "StringEquals": "READY",
+          "Next": "Validate Raw Data"
+        }
+      ],
+      "Default": "Wait For Raw Crawler"
+    },
+    "Validate Raw Data": {
+      "Type": "Task",
+      "Resource": "${validate_raw_lambda_arn}",
+      "Next": "Invoke Nightly ETL Pipeline",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 30,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ]
+    },
+    "Invoke Nightly ETL Pipeline": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::states:startExecution.sync",
+      "Parameters": {
+        "StateMachineArn": "${child_state_machine_arn}",
+        "Input.$": "$"
+      },
+      "ResultPath": "$.NightlyEtlResult",
+      "Next": "Success State",
+      "Catch": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "Next": "Send Failure Notification"
+        }
+      ]
+    },
+    "Success State": {
+      "Type": "Succeed"
+    },
+    "Send Failure Notification": {
+      "Type": "Task",
+      "Resource": "${notify_failure_lambda_arn}",
+      "ResultPath": null,
+      "Next": "Fail State"
+    },
+    "Fail State": {
+      "Type": "Fail",
+      "Cause": "Pipeline failed"
+    }
+  }
+}

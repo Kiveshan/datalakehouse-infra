@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 900 700" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="Pipeline: an EventBridge Scheduler starts dms-raw every night at 23:00 Africa/Johannesburg; dms-raw replicates Azure MySQL via DMS into S3 raw, which a Glue crawler catalogs; Glue ETL cleans it into S3 curated, builds SCD2 dims and Kimball facts in S3 layer2 as Iceberg tables, then publishes them to RDS Postgres. Two Step Functions state machines, dms-raw and src-improved-pipeline, orchestrate the two halves.">
+  <style>
+    .stage-title { font: 600 14px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .stage-sub   { font: 400 11.5px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .arrow-label { font: 400 11.5px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .sfn-label   { font: 600 11.5px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .ext-label   { font: 600 11.5px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+
+    .bg        { fill: #ffffff; }
+    .edge      { stroke: #57606a; }
+    .edge-text { fill: #57606a; }
+    .box-text  { fill: #1f2328; }
+    .box-sub   { fill: #57606a; }
+
+    .ext-box   { fill: #f6f8fa; stroke: #6e7781; }
+    .ext-text  { fill: #57606a; }
+
+    .sched-box { fill: #eaf7ec; stroke: #1a7f37; }
+
+    .dms-box   { fill: #eafaf6; stroke: #0f9d8c; }
+    .s3-box    { fill: #fff4e8; stroke: #d9730d; }
+    .ice-box   { fill: #f0eefc; stroke: #6c4fd0; }
+    .pg-box    { fill: #eaf1ff; stroke: #2f6fed; }
+
+    .sfn-a     { stroke: #1a7f37; fill: none; }
+    .sfn-a-text{ fill: #1a7f37; }
+    .sfn-b     { stroke: #9a6700; fill: none; }
+    .sfn-b-text{ fill: #9a6700; }
+
+    @media (prefers-color-scheme: dark) {
+      .bg        { fill: #0d1117; }
+      .edge      { stroke: #8b949e; }
+      .edge-text { fill: #8b949e; }
+      .box-text  { fill: #e6edf3; }
+      .box-sub   { fill: #9198a1; }
+
+      .ext-box   { fill: #161b22; stroke: #6e7681; }
+      .ext-text  { fill: #9198a1; }
+
+      .sched-box { fill: #0d2417; stroke: #3fb950; }
+
+      .dms-box   { fill: #0d2b26; stroke: #3fd7bd; }
+      .s3-box    { fill: #2b1c0c; stroke: #f0a848; }
+      .ice-box   { fill: #201a3d; stroke: #a48cff; }
+      .pg-box    { fill: #101f3d; stroke: #79a6ff; }
+
+      .sfn-a     { stroke: #3fb950; }
+      .sfn-a-text{ fill: #3fb950; }
+      .sfn-b     { stroke: #d29922; }
+      .sfn-b-text{ fill: #d29922; }
+    }
+  </style>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" class="edge" />
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="900" height="700" />
+
+  <!-- Step Functions bracket A: dms-raw (DMS instance -> S3 raw -> crawl) -->
+  <path class="sfn-a" stroke-width="1.5" stroke-dasharray="4 3"
+        d="M 118 128 H 100 V 344 H 118" fill="none" />
+  <text class="sfn-label sfn-a-text" x="94" y="236" text-anchor="middle"
+        transform="rotate(-90 94 236)">Step Functions: dms-raw</text>
+
+  <!-- Step Functions bracket B: src-improved-pipeline (curated -> layer2 -> publish) -->
+  <path class="sfn-b" stroke-width="1.5" stroke-dasharray="4 3"
+        d="M 118 340 H 100 V 632 H 118" fill="none" />
+  <text class="sfn-label sfn-b-text" x="94" y="486" text-anchor="middle"
+        transform="rotate(-90 94 486)">Step Functions: src-improved-pipeline</text>
+
+  <!-- 0. EventBridge Scheduler -->
+  <rect class="sched-box" x="20" y="30" width="210" height="52" rx="8" stroke-width="1.5" />
+  <text class="ext-label box-text" x="125" y="52" text-anchor="middle">EventBridge Scheduler</text>
+  <text class="stage-sub box-sub" x="125" y="70" text-anchor="middle">23:00 Africa/Johannesburg, nightly</text>
+
+  <path class="sfn-a" stroke-width="1.5" fill="none" marker-end="url(#arrow)"
+        d="M 125 82 V 105 H 118" />
+  <text class="arrow-label sfn-a-text" x="130" y="100">starts dms-raw</text>
+
+  <!-- 1. Azure MySQL (external) -->
+  <rect class="ext-box" x="280" y="24" width="340" height="56" rx="8" stroke-width="1.5" stroke-dasharray="5 3" />
+  <text class="ext-label ext-text" x="450" y="47" text-anchor="middle">Azure MySQL</text>
+  <text class="stage-sub ext-text" x="450" y="65" text-anchor="middle">lms_src schema · client-owned, outside this account</text>
+
+  <line class="edge" x1="450" y1="80" x2="450" y2="122" stroke-width="1.5" marker-end="url(#arrow)" />
+  <text class="arrow-label edge-text" x="464" y="105">DMS full-load replication</text>
+
+  <!-- 2. DMS replication instance -->
+  <rect class="dms-box" x="280" y="128" width="340" height="56" rx="8" stroke-width="1.5" />
+  <text class="stage-title box-text" x="450" y="151" text-anchor="middle">DMS replication instance</text>
+  <text class="stage-sub box-sub" x="450" y="169" text-anchor="middle">TargetTablePrepMode = DROP_AND_CREATE</text>
+
+  <line class="edge" x1="450" y1="184" x2="450" y2="226" stroke-width="1.5" marker-end="url(#arrow)" />
+  <text class="arrow-label edge-text" x="464" y="209">writes Parquet, one file per table</text>
+
+  <!-- 3. S3 raw/ -->
+  <rect class="s3-box" x="280" y="232" width="340" height="56" rx="8" stroke-width="1.5" />
+  <text class="stage-title box-text" x="450" y="255" text-anchor="middle">S3  raw/</text>
+  <text class="stage-sub box-sub" x="450" y="273" text-anchor="middle">overwritten wholesale on every reload</text>
+
+  <line class="edge" x1="450" y1="288" x2="450" y2="336" stroke-width="1.5" marker-end="url(#arrow)" />
+  <text class="arrow-label edge-text" x="464" y="306">Glue crawler</text>
+  <text class="arrow-label edge-text" x="464" y="321">re-crawls raw/ into Glue Catalog</text>
+
+  <!-- 4. S3 curated/ -->
+  <rect class="s3-box" x="280" y="342" width="340" height="56" rx="8" stroke-width="1.5" />
+  <text class="stage-title box-text" x="450" y="365" text-anchor="middle">S3  curated/</text>
+  <text class="stage-sub box-sub" x="450" y="383" text-anchor="middle">cleaned per-table Parquet · Django/audit tables dropped</text>
+
+  <line class="edge" x1="450" y1="398" x2="450" y2="440" stroke-width="1.5" marker-end="url(#arrow)" />
+  <text class="arrow-label edge-text" x="464" y="416">Glue ETL</text>
+  <text class="arrow-label edge-text" x="464" y="431">builds SCD2 dims (Iceberg CTAS/MERGE)</text>
+
+  <!-- 5. S3 layer2/ -->
+  <rect class="ice-box" x="280" y="446" width="340" height="68" rx="8" stroke-width="1.5" />
+  <text class="stage-title box-text" x="450" y="470" text-anchor="middle">S3  layer2/  (Iceberg)</text>
+  <text class="stage-sub box-sub" x="450" y="488" text-anchor="middle">dim_* (SCD2, full history)</text>
+  <text class="stage-sub box-sub" x="450" y="503" text-anchor="middle">fact_* (Kimball facts, joined from dims)</text>
+
+  <line class="edge" x1="450" y1="514" x2="450" y2="556" stroke-width="1.5" marker-end="url(#arrow)" />
+  <text class="arrow-label edge-text" x="464" y="532">Glue ETL</text>
+  <text class="arrow-label edge-text" x="464" y="547">publishes, incremental upsert by table</text>
+
+  <!-- 6. RDS Postgres -->
+  <rect class="pg-box" x="280" y="562" width="340" height="56" rx="8" stroke-width="1.5" />
+  <text class="stage-title box-text" x="450" y="585" text-anchor="middle">RDS Postgres</text>
+  <text class="stage-sub box-sub" x="450" y="603" text-anchor="middle">mirrored dims + facts for downstream BI</text>
+
+  <!-- Legend / caption -->
+  <text class="stage-sub box-sub" x="450" y="655" text-anchor="middle">
+    dms-raw runs automatically every night; everything else is triggered manually or via the state machines above.
+  </text>
+</svg>

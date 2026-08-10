@@ -1,0 +1,427 @@
+{
+  "Comment": "Sequential nightly ETL: raw -> build_layer2_dims_scd2 -> build_layer2_facts -> build_etqa_facts -> build_layer2_facts_ctas -> publish_layer2_dims_postgres -> publish_layer2_facts_postgres -> publish_etqa_facts_postgres",
+  "StartAt": "Start Raw Glue Job",
+  "States": {
+    "Start Raw Glue Job": {
+      "Type": "Task",
+      "Resource": "${start_glue_job_lambda_arn}",
+      "Parameters": {
+        "jobName": "${move_raw_tables_job_name}"
+      },
+      "ResultPath": "$.raw",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed",
+            "States.Timeout"
+          ],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "Wait For Raw Glue Job"
+    },
+    "Wait For Raw Glue Job": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "Check Raw Glue Job"
+    },
+    "Check Raw Glue Job": {
+      "Type": "Task",
+      "Resource": "${check_glue_job_lambda_arn}",
+      "Parameters": {
+        "jobName": "${move_raw_tables_job_name}",
+        "jobRunId.$": "$.raw.jobRunId"
+      },
+      "ResultPath": "$.rawStatus",
+      "Next": "Raw Glue Job Status"
+    },
+    "Raw Glue Job Status": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.rawStatus.status",
+          "StringEquals": "SUCCEEDED",
+          "Next": "Start Layer2 Update Glue Job"
+        },
+        {
+          "Variable": "$.rawStatus.status",
+          "StringEquals": "FAILED",
+          "Next": "Send Failure Notification"
+        }
+      ],
+      "Default": "Wait For Raw Glue Job"
+    },
+    "Start Layer2 Update Glue Job": {
+      "Type": "Task",
+      "Resource": "${start_glue_job_lambda_arn}",
+      "Parameters": {
+        "jobName": "${build_layer2_dims_scd2_job_name}"
+      },
+      "ResultPath": "$.l2",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed",
+            "States.Timeout"
+          ],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "Wait For Layer2 Update Glue Job"
+    },
+    "Wait For Layer2 Update Glue Job": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "Check Layer2 Update Glue Job"
+    },
+    "Check Layer2 Update Glue Job": {
+      "Type": "Task",
+      "Resource": "${check_glue_job_lambda_arn}",
+      "Parameters": {
+        "jobName": "${build_layer2_dims_scd2_job_name}",
+        "jobRunId.$": "$.l2.jobRunId"
+      },
+      "ResultPath": "$.l2Status",
+      "Next": "Layer2 Update Glue Job Status"
+    },
+    "Layer2 Update Glue Job Status": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.l2Status.status",
+          "StringEquals": "SUCCEEDED",
+          "Next": "Start LPD Facts Glue Job"
+        },
+        {
+          "Variable": "$.l2Status.status",
+          "StringEquals": "FAILED",
+          "Next": "Send Failure Notification"
+        }
+      ],
+      "Default": "Wait For Layer2 Update Glue Job"
+    },
+    "Start LPD Facts Glue Job": {
+      "Type": "Task",
+      "Resource": "${start_glue_job_lambda_arn}",
+      "Parameters": {
+        "jobName": "${build_layer2_facts_job_name}"
+      },
+      "ResultPath": "$.lpdFacts",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed",
+            "States.Timeout"
+          ],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "Wait For LPD Facts Glue Job"
+    },
+    "Wait For LPD Facts Glue Job": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "Check LPD Facts Glue Job"
+    },
+    "Check LPD Facts Glue Job": {
+      "Type": "Task",
+      "Resource": "${check_glue_job_lambda_arn}",
+      "Parameters": {
+        "jobName": "${build_layer2_facts_job_name}",
+        "jobRunId.$": "$.lpdFacts.jobRunId"
+      },
+      "ResultPath": "$.lpdFactsStatus",
+      "Next": "LPD Facts Glue Job Status"
+    },
+    "LPD Facts Glue Job Status": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.lpdFactsStatus.status",
+          "StringEquals": "SUCCEEDED",
+          "Next": "Start ETQA Facts Glue Job"
+        },
+        {
+          "Variable": "$.lpdFactsStatus.status",
+          "StringEquals": "FAILED",
+          "Next": "Send Failure Notification"
+        }
+      ],
+      "Default": "Wait For LPD Facts Glue Job"
+    },
+    "Start ETQA Facts Glue Job": {
+      "Type": "Task",
+      "Resource": "${start_glue_job_lambda_arn}",
+      "Parameters": {
+        "jobName": "${build_etqa_facts_job_name}"
+      },
+      "ResultPath": "$.etqaFacts",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed",
+            "States.Timeout"
+          ],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "Wait For ETQA Facts Glue Job"
+    },
+    "Wait For ETQA Facts Glue Job": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "Check ETQA Facts Glue Job"
+    },
+    "Check ETQA Facts Glue Job": {
+      "Type": "Task",
+      "Resource": "${check_glue_job_lambda_arn}",
+      "Parameters": {
+        "jobName": "${build_etqa_facts_job_name}",
+        "jobRunId.$": "$.etqaFacts.jobRunId"
+      },
+      "ResultPath": "$.etqaFactsStatus",
+      "Next": "ETQA Facts Glue Job Status"
+    },
+    "ETQA Facts Glue Job Status": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.etqaFactsStatus.status",
+          "StringEquals": "SUCCEEDED",
+          "Next": "Start CTAS Auto Glue Job"
+        },
+        {
+          "Variable": "$.etqaFactsStatus.status",
+          "StringEquals": "FAILED",
+          "Next": "Send Failure Notification"
+        }
+      ],
+      "Default": "Wait For ETQA Facts Glue Job"
+    },
+    "Start CTAS Auto Glue Job": {
+      "Type": "Task",
+      "Resource": "${start_glue_job_lambda_arn}",
+      "Parameters": {
+        "jobName": "${build_layer2_facts_ctas_job_name}"
+      },
+      "ResultPath": "$.ctasAuto",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed",
+            "States.Timeout"
+          ],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "Wait For CTAS Auto Glue Job"
+    },
+    "Wait For CTAS Auto Glue Job": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "Check CTAS Auto Glue Job"
+    },
+    "Check CTAS Auto Glue Job": {
+      "Type": "Task",
+      "Resource": "${check_glue_job_lambda_arn}",
+      "Parameters": {
+        "jobName": "${build_layer2_facts_ctas_job_name}",
+        "jobRunId.$": "$.ctasAuto.jobRunId"
+      },
+      "ResultPath": "$.ctasAutoStatus",
+      "Next": "CTAS Auto Glue Job Status"
+    },
+    "CTAS Auto Glue Job Status": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.ctasAutoStatus.status",
+          "StringEquals": "SUCCEEDED",
+          "Next": "Start Publish Layer2 Postgres Glue Job"
+        },
+        {
+          "Variable": "$.ctasAutoStatus.status",
+          "StringEquals": "FAILED",
+          "Next": "Send Failure Notification"
+        }
+      ],
+      "Default": "Wait For CTAS Auto Glue Job"
+    },
+    "Start Publish Layer2 Postgres Glue Job": {
+      "Type": "Task",
+      "Resource": "${start_glue_job_lambda_arn}",
+      "Parameters": {
+        "jobName": "${publish_layer2_dims_postgres_job_name}"
+      },
+      "ResultPath": "$.publish",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed",
+            "States.Timeout"
+          ],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "Wait For Publish Layer2 Postgres Glue Job"
+    },
+    "Wait For Publish Layer2 Postgres Glue Job": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "Check Publish Layer2 Postgres Glue Job"
+    },
+    "Check Publish Layer2 Postgres Glue Job": {
+      "Type": "Task",
+      "Resource": "${check_glue_job_lambda_arn}",
+      "Parameters": {
+        "jobName": "${publish_layer2_dims_postgres_job_name}",
+        "jobRunId.$": "$.publish.jobRunId"
+      },
+      "ResultPath": "$.publishStatus",
+      "Next": "Publish Layer2 Postgres Glue Job Status"
+    },
+    "Publish Layer2 Postgres Glue Job Status": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.publishStatus.status",
+          "StringEquals": "SUCCEEDED",
+          "Next": "Start Publish Facts Postgres Glue Job"
+        },
+        {
+          "Variable": "$.publishStatus.status",
+          "StringEquals": "FAILED",
+          "Next": "Send Failure Notification"
+        }
+      ],
+      "Default": "Wait For Publish Layer2 Postgres Glue Job"
+    },
+    "Start Publish Facts Postgres Glue Job": {
+      "Type": "Task",
+      "Resource": "${start_glue_job_lambda_arn}",
+      "Parameters": {
+        "jobName": "${publish_layer2_facts_postgres_job_name}"
+      },
+      "ResultPath": "$.publishFacts",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed",
+            "States.Timeout"
+          ],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "Wait For Publish Facts Postgres Glue Job"
+    },
+    "Wait For Publish Facts Postgres Glue Job": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "Check Publish Facts Postgres Glue Job"
+    },
+    "Check Publish Facts Postgres Glue Job": {
+      "Type": "Task",
+      "Resource": "${check_glue_job_lambda_arn}",
+      "Parameters": {
+        "jobName": "${publish_layer2_facts_postgres_job_name}",
+        "jobRunId.$": "$.publishFacts.jobRunId"
+      },
+      "ResultPath": "$.publishFactsStatus",
+      "Next": "Publish Facts Postgres Glue Job Status"
+    },
+    "Publish Facts Postgres Glue Job Status": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.publishFactsStatus.status",
+          "StringEquals": "SUCCEEDED",
+          "Next": "Start Publish ETQA Facts Postgres Glue Job"
+        },
+        {
+          "Variable": "$.publishFactsStatus.status",
+          "StringEquals": "FAILED",
+          "Next": "Send Failure Notification"
+        }
+      ],
+      "Default": "Wait For Publish Facts Postgres Glue Job"
+    },
+    "Start Publish ETQA Facts Postgres Glue Job": {
+      "Type": "Task",
+      "Resource": "${start_glue_job_lambda_arn}",
+      "Parameters": {
+        "jobName": "${publish_etqa_facts_postgres_job_name}"
+      },
+      "ResultPath": "$.publishEtqaFacts",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.TaskFailed",
+            "States.Timeout"
+          ],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "Wait For Publish ETQA Facts Postgres Glue Job"
+    },
+    "Wait For Publish ETQA Facts Postgres Glue Job": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "Check Publish ETQA Facts Postgres Glue Job"
+    },
+    "Check Publish ETQA Facts Postgres Glue Job": {
+      "Type": "Task",
+      "Resource": "${check_glue_job_lambda_arn}",
+      "Parameters": {
+        "jobName": "${publish_etqa_facts_postgres_job_name}",
+        "jobRunId.$": "$.publishEtqaFacts.jobRunId"
+      },
+      "ResultPath": "$.publishEtqaFactsStatus",
+      "Next": "Publish ETQA Facts Postgres Glue Job Status"
+    },
+    "Publish ETQA Facts Postgres Glue Job Status": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.publishEtqaFactsStatus.status",
+          "StringEquals": "SUCCEEDED",
+          "Next": "Success"
+        },
+        {
+          "Variable": "$.publishEtqaFactsStatus.status",
+          "StringEquals": "FAILED",
+          "Next": "Send Failure Notification"
+        }
+      ],
+      "Default": "Wait For Publish ETQA Facts Postgres Glue Job"
+    },
+    "Send Failure Notification": {
+      "Type": "Task",
+      "Resource": "${notify_failure_lambda_arn}",
+      "ResultPath": null,
+      "Next": "Fail"
+    },
+    "Success": {
+      "Type": "Succeed"
+    },
+    "Fail": {
+      "Type": "Fail",
+      "Cause": "One or more Glue jobs failed"
+    }
+  }
+}
