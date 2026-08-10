@@ -81,10 +81,6 @@ than on its own separate schedule. After `apply`:
   Manager, and read by each Glue/Lambda script at runtime.
 - `prod.tfvars`, `*.tfstate`, `tfplan`, and Lambda `node_modules/` are all gitignored and were
   never committed.
-- [publish_postgres.tf](infra/publish_postgres.tf) documents why this matters: the original
-  hand-built version of this pipeline had its Postgres password committed in plaintext across
-  shared docs. This rebuild reads everything from Secrets Manager instead, and that password was
-  rotated independently of this repo.
 
 ## Known limitations
 
