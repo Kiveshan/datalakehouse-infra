@@ -64,7 +64,6 @@ LIMIT_TABLES = [
     # "company_company", "lpd_loi"
 ]
 
-# Parallel workers across tables
 MAX_WORKERS = 2
 
 # RAW->DIM alias for name differences (per source table; maps curated->DIM column names)
@@ -73,7 +72,6 @@ RAW_DIM_ALIAS = {
     # "company_company": {"company_registration_no": "registration_no"},
 }
 
-# Optional repartition hint for very large/wide curated tables
 REPARTITION_HINT = {
     # "company_company": 8,
 }
@@ -82,7 +80,7 @@ REPARTITION_HINT = {
 COMPUTE_SIG_HASH = False
 
 SENTINEL_TO = "9999-12-31 23:59:59"
-STATIC_DIMS = {"dim_date", "dim_status"}  # excluded
+STATIC_DIMS = {"dim_date", "dim_status"}
 EXCLUDE_TABLES = set()
 BASE_SCD2_COLS = {"sig_hash", "effective_from", "effective_to", "current_flag", "version"}
 
@@ -535,7 +533,6 @@ def resolve_nk(target_cols, source_table):
 def type_sql(dt: DataType) -> str:
     return dt.simpleString()
 
-# ---- Clamp ancient Date/Timestamp values to NULL ----
 def clamp_ancient_dt(df: DataFrame) -> DataFrame:
     if not CLAMP_ANCIENT_DATES_FOR_ALL:
         return df
@@ -560,14 +557,13 @@ def stage_df_from_raw(raw_df: DataFrame, dim_schema: StructType, source_table: s
     if sk in target_cols: exclude.add(sk)
     business_cols = [c for c in target_cols if c not in exclude and c != nk]
 
-    alias_map = RAW_DIM_ALIAS.get(source_table, {})  # curated->DIM map
+    alias_map = RAW_DIM_ALIAS.get(source_table, {})
 
     df = raw_df
     rp = REPARTITION_HINT.get(source_table)
     if rp and df.rdd.getNumPartitions() < rp:
         df = df.repartition(int(rp))
 
-    # NK
     if nk and nk in df.columns:
         df = df.withColumn(nk, F.col(nk).cast(target_types[nk]))
     elif nk and "id" in df.columns:
@@ -582,7 +578,7 @@ def stage_df_from_raw(raw_df: DataFrame, dim_schema: StructType, source_table: s
             if dc == dim_col:
                 raw_col = rc; break
         if raw_col is None:
-            raw_col = dim_col  # same name case
+            raw_col = dim_col
         if raw_col in df.columns:
             df = df.withColumn(dim_col, F.col(raw_col).cast(target_types[dim_col]))
         else:
@@ -673,7 +669,6 @@ def process_table(source_table: str, load_ts_str: str):
         print(f"[{source_table}] ERROR: Could not determine NK (no 'id' or '{source_table}_id').")
         return (source_table, 0, "no_nk")
 
-    # Views
     stg_view = f"stg__{source_table}"
     cur_view = f"cur__{source_table}"
     stg_df.createOrReplaceTempView(stg_view)
@@ -731,7 +726,6 @@ def process_table(source_table: str, load_ts_str: str):
         print(f"[{source_table}] ERROR closing deleted: {e}")
         return (source_table, 0, "close_deleted_error")
 
-    # Integrity guard: ensure single current per NK
     integrity_fix_one_current(dim_name, nk_col)
 
     # ================= MERGE #2: INSERT NEW & CHANGED =================
@@ -803,7 +797,6 @@ def process_table(source_table: str, load_ts_str: str):
 
 # ===================== Orchestration =====================
 def main():
-    # Runtime load timestamp (UTC)
     load_ts = datetime.now(timezone.utc).replace(tzinfo=None)
     load_ts_str = load_ts.isoformat(sep=' ')
 

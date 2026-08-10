@@ -52,7 +52,6 @@ curated_prefix = args['target_prefix']
 if not curated_prefix.endswith('/'):
     curated_prefix += '/'
 
-# Tables to SKIP (case-insensitive)
 EXCLUDE_TABLES = [
     "accounts_useremail",
     "accounts_userforgetpasswordtoken",
@@ -81,7 +80,6 @@ EXCLUDE_TABLES = [
 ]
 exclude_set = set(t.lower() for t in EXCLUDE_TABLES)
 
-# Optional: force-drop specific column names (case-insensitive)
 FORCE_DROP_COLUMNS = [
     # e.g., "supporting_document", "proof_of_payment", "file_path"
 ]
@@ -135,7 +133,6 @@ def decide_columns_to_keep(df, table_name):
     dtypes = dict(df.dtypes)
     columns = df.columns
 
-    # Build aggregations in one go
     agg_exprs = []
     for c in columns:
         cexpr = col(c)
@@ -190,10 +187,8 @@ def process_single_table(table: str):
             msg = f"⚠️ {table}: no valid columns (empty or all dropped). Skipping."
             print(msg); return msg
 
-        # Drop columns entirely by selecting only the valid ones
         cleaned_df = df.select(*valid_cols)
 
-        # Repartition only for large datasets
         if total_rows > 1_000_000:
             cleaned_df = cleaned_df.repartition(16)
         elif total_rows > 100_000:
@@ -245,7 +240,6 @@ def main():
     print(f"Found {len(all_tables)} tables in '{source_database}'. "
           f"Excluding {len(exclude_set)} → processing {len(target_tables)}.")
 
-    # Tune based on your Glue DPUs (3–6 is typical)
     workers = DEFAULT_MAX_WORKERS
     run_parallel(target_tables, max_workers=workers)
 

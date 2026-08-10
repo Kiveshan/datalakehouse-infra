@@ -202,7 +202,6 @@ CREATE TABLE IF NOT EXISTS {PG_SCHEMA}._mirror_control(
 );
 ''')
 
-# ========= Discover tables =========
 rows = spark.sql(f'SHOW TABLES IN {ICE_CATALOG}.{ICE_DB}').collect()
 tables = [r.tableName for r in rows]
 
