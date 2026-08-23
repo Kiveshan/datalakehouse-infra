@@ -11,6 +11,7 @@
   "description": "",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.859.0",
-    "@aws-sdk/client-glue": "^3.859.0"
+    "@aws-sdk/client-glue": "^3.859.0",
+    "@aws-sdk/client-cloudwatch": "^3.859.0"
   }
 }

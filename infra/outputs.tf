@@ -96,3 +96,8 @@ output "etl_pipeline_notifications_topic_arn" {
   description = "SNS topic notify-failure publishes to on any pipeline failure. Subscribe with: aws sns subscribe --topic-arn <this> --protocol email --notification-endpoint <address> (or set notify_failure_email and re-apply)"
   value       = aws_sns_topic.etl_pipeline_notifications.arn
 }
+
+output "etl_pipeline_dashboard_url" {
+  description = "CloudWatch dashboard: records processed, pipeline duration, validation failures, and error rate."
+  value       = "https://${var.aws_region}.console.aws.amazon.com/cloudwatch/home?region=${var.aws_region}#dashboards:name=${aws_cloudwatch_dashboard.etl_pipeline.dashboard_name}"
+}

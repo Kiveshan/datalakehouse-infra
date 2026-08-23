@@ -101,6 +101,8 @@ DEFAULT_MAX_WORKERS = 4
 
 # ===================== AWS clients =====================
 glue_client = boto3.client('glue')
+cloudwatch_client = boto3.client('cloudwatch')
+METRICS_NAMESPACE = "ETLPipeline"
 
 # ===================== Helpers =====================
 def list_all_tables(database: str):
@@ -185,7 +187,7 @@ def process_single_table(table: str):
         valid_cols, dropped_cols, total_rows = decide_columns_to_keep(df, table)
         if not valid_cols:
             msg = f"⚠️ {table}: no valid columns (empty or all dropped). Skipping."
-            print(msg); return msg
+            print(msg); return {"table": table, "status": "skipped", "rows": 0, "message": msg}
 
         cleaned_df = df.select(*valid_cols)
 
@@ -205,12 +207,12 @@ def process_single_table(table: str):
 
         msg = (f"[OK] {table} → {output_path} in {time() - t0:.2f}s "
                f"(kept_cols={len(valid_cols)}, dropped_cols={len(dropped_cols)}, rows={total_rows})")
-        print(msg); return msg
+        print(msg); return {"table": table, "status": "ok", "rows": total_rows, "message": msg}
 
     except Exception as e:
         err = f"[ERROR] {table}: {str(e)}"
         print(err); traceback.print_exc()
-        return err
+        return {"table": table, "status": "error", "rows": 0, "message": err}
 
 def run_parallel(tables, max_workers=DEFAULT_MAX_WORKERS):
     max_workers = max(1, min(int(max_workers), len(tables)))
@@ -225,11 +227,42 @@ def run_parallel(tables, max_workers=DEFAULT_MAX_WORKERS):
             try:
                 res = fut.result()
                 results.append(res)
-                print(f"✅ [{completed}/{len(tables)}] {res}")
+                print(f"✅ [{completed}/{len(tables)}] {res['message']}")
             except Exception as e:
+                err_msg = f"[ERROR] {futures[fut]}: {str(e)}"
                 print(f"❌ [{completed}/{len(tables)}] Failed {futures[fut]}: {str(e)}")
+                results.append({"table": futures[fut], "status": "error", "rows": 0, "message": err_msg})
 
     return results
+
+def publish_run_metrics(results, duration_seconds: float):
+    """
+    Emits this run's record/table counts and duration to the ETLPipeline
+    CloudWatch namespace so the dashboard and case-study screenshot have real
+    numbers instead of relying on scraping Glue logs after the fact.
+    """
+    records_processed = sum(r["rows"] for r in results if r["status"] == "ok")
+    tables_ok = sum(1 for r in results if r["status"] == "ok")
+    tables_failed = sum(1 for r in results if r["status"] == "error")
+    tables_skipped = sum(1 for r in results if r["status"] == "skipped")
+
+    dimensions = [{"Name": "JobName", "Value": args["JOB_NAME"]}]
+    try:
+        cloudwatch_client.put_metric_data(
+            Namespace=METRICS_NAMESPACE,
+            MetricData=[
+                {"MetricName": "RecordsProcessed", "Value": records_processed, "Unit": "Count", "Dimensions": dimensions},
+                {"MetricName": "TablesProcessed", "Value": tables_ok, "Unit": "Count", "Dimensions": dimensions},
+                {"MetricName": "TablesFailed", "Value": tables_failed, "Unit": "Count", "Dimensions": dimensions},
+                {"MetricName": "TablesSkipped", "Value": tables_skipped, "Unit": "Count", "Dimensions": dimensions},
+                {"MetricName": "JobDurationSeconds", "Value": duration_seconds, "Unit": "Seconds", "Dimensions": dimensions},
+            ],
+        )
+        print(f"📊 Published run metrics: records={records_processed}, ok={tables_ok}, "
+              f"failed={tables_failed}, skipped={tables_skipped}, duration={duration_seconds:.2f}s")
+    except Exception as e:
+        # Metrics are best-effort -- never fail the job over a CloudWatch hiccup.
+        print(f"⚠️ Could not publish run metrics: {e}")
 
 # ===================== Orchestrate =====================
 def main():
@@ -241,9 +274,12 @@ def main():
           f"Excluding {len(exclude_set)} → processing {len(target_tables)}.")
 
     workers = DEFAULT_MAX_WORKERS
-    run_parallel(target_tables, max_workers=workers)
+    results = run_parallel(target_tables, max_workers=workers)
 
-    print(f"🎉 All done in {time() - job_start:.2f}s")
+    duration_seconds = time() - job_start
+    publish_run_metrics(results, duration_seconds)
+
+    print(f"🎉 All done in {duration_seconds:.2f}s")
 
 if __name__ == "__main__":
     main()

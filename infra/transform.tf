@@ -65,6 +65,13 @@ data "aws_iam_policy_document" "glue_etl_s3" {
       values   = ["raw/*", "curated/*", "scripts/*"]
     }
   }
+
+  statement {
+    sid = "PutPipelineMetrics"
+    # PutMetricData does not support resource-level permissions.
+    actions   = ["cloudwatch:PutMetricData"]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_role_policy" "glue_etl_s3" {

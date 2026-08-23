@@ -387,6 +387,13 @@ data "aws_iam_policy_document" "lambda_pipeline" {
     actions   = ["sns:Publish"]
     resources = [aws_sns_topic.etl_pipeline_notifications.arn]
   }
+
+  statement {
+    sid = "PutPipelineMetrics"
+    # PutMetricData does not support resource-level permissions.
+    actions   = ["cloudwatch:PutMetricData"]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_role_policy" "lambda_pipeline" {

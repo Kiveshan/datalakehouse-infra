@@ -1,8 +1,11 @@
 const { S3Client, ListObjectsV2Command } = require("@aws-sdk/client-s3");
 const { GlueClient, GetTableCommand } = require("@aws-sdk/client-glue");
+const { CloudWatchClient, PutMetricDataCommand } = require("@aws-sdk/client-cloudwatch");
 
 const s3 = new S3Client({});
 const glue = new GlueClient({});
+const cloudwatch = new CloudWatchClient({});
+const METRICS_NAMESPACE = "ETLPipeline";
 
 // LAKEHOUSE_BUCKET -> aws_s3_bucket.lakehouse-bucket.id (storage.tf)
 // RAW_DATABASE     -> aws_glue_catalog_database.raw.name (catalog.tf)
@@ -63,6 +66,8 @@ exports.handler = async () => {
     }
   }
 
+  await publishValidationMetrics(listed.CommonPrefixes.length, failures.length);
+
   if (failures.length) {
     throw new Error(`Validation failed:\n${failures.join("\n")}`);
   }
@@ -72,3 +77,23 @@ exports.handler = async () => {
     tableCount: listed.CommonPrefixes.length,
   };
 };
+
+// Reports table-level validation results (missing S3 data / missing or
+// columnless Glue tables) to CloudWatch, not row-level data quality --
+// this lambda checks structure, not row content.
+async function publishValidationMetrics(tablesValidated, validationFailures) {
+  try {
+    await cloudwatch.send(
+      new PutMetricDataCommand({
+        Namespace: METRICS_NAMESPACE,
+        MetricData: [
+          { MetricName: "TablesValidated", Value: tablesValidated, Unit: "Count" },
+          { MetricName: "ValidationFailures", Value: validationFailures, Unit: "Count" },
+        ],
+      })
+    );
+  } catch (err) {
+    // Metrics are best-effort -- never fail validation over a CloudWatch hiccup.
+    console.warn(`Could not publish validation metrics: ${err}`);
+  }
+}
